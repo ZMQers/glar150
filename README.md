@@ -355,3 +355,71 @@ The [code generator](https://github.com/CodeJockey/glar150/blob/master/src/fsm_c
 ## Building the Code
 
 Still to be written.
+
+## Run a demo with multipe docker containers
+
+The glard daemon has been rewritten to drop the GPIO blinking features at last
+ZMQ hackaton.
+
+It can now be used to launch commands on multiple slaves.
+
+A simple way to test the glard daemon is to use a docker container which spawns a glard daemon:
+
+```
+$ docker build -f Dockerfile.obs -t glard
+```
+
+You should then have an image named "glard:latest" in "docker images".
+
+If you want to avoid building the docker image, there is one prebuilt for you:
+
+```
+$ docker run zoobab/glar150
+glard v1.0.1 -- GL-AR150 demo'n
+I: 17-11-01 18:08:26 using interface=eth0 my_uuid=1CF2281F0C9A4DD596C29EF1EF2F5C17 my_name=1CF228
+```
+
+Then spawn 3 containers running glard:
+
+```
+$ docker run -d glard
+b6d495af00604457061bd13fce0867f097fccfe569c074c9869fb2c0c047bf4e
+$ docker run -d glard
+5af819f9d7123acc407aa6cefcb992ca2b59fc06a191b6dc4d5fd590cea95f44
+$ docker run -d glard
+cafe37cf9499d9f64f55b9154b84d93038912ae091033e2f09aecd97b71499cd
+```
+
+Then launch the fourth one with the controller "-c" and the interactive shell:
+
+```
+$ docker run -it glard -c
+glard v1.0.1 -- GL-AR150 demo'n
+I: 17-11-01 17:52:04 using interface=eth0 my_uuid=C3A0AA7977B943D68AD5B7E1A5B8AEB4 my_name=C3A0AA
+I: 17-11-01 17:52:04 JOINED peer=5A793D
+I: 17-11-01 17:52:04 JOINED peer=CB5DA2
+I: 17-11-01 17:52:04 JOINED peer=9EA303
+```
+You should then type the command "pwd" and observer that it is launched on the
+3 slaves:
+
+```
+pwd
+9EA303: /
+
+CB5DA2: /
+
+5A793D: /
+```
+
+If you launch the "hostname" command, you should find the names of the 3
+containers that were launched earlier:
+
+```
+hostname
+5A793D: 5af819f9d712
+
+9EA303: b6d495af0060
+
+CB5DA2: cafe37cf9499
+```
