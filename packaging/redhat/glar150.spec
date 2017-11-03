@@ -19,6 +19,7 @@
 %else
 %define DRAFTS no
 %endif
+%define SYSTEMD_UNIT_DIR %(pkg-config --variable=systemdsystemunitdir systemd)
 Name:           glar150
 Version:        0.0.1
 Release:        1
@@ -104,7 +105,7 @@ find %{buildroot} -name '*.la' | xargs rm -f
 %{_bindir}/glard
 %{_mandir}/man1/glard*
 %config(noreplace) %{_sysconfdir}/glar150/glard.cfg
-/usr/lib/systemd/system/glard.service
+%{SYSTEMD_UNIT_DIR}/glard.service
 %dir %{_sysconfdir}/glar150
 %if 0%{?suse_version} > 1315
 %post
