@@ -6,9 +6,6 @@
 if (NOT MSVC)
     include(FindPkgConfig)
     pkg_check_modules(PC_ZYRE "libzyre")
-    if (NOT PC_ZYRE_FOUND)
-        pkg_check_modules(PC_ZYRE "libzyre")
-    endif (NOT PC_ZYRE_FOUND)
     if (PC_ZYRE_FOUND)
         # add CFLAGS from pkg-config file, e.g. draft api.
         add_definitions(${PC_ZYRE_CFLAGS} ${PC_ZYRE_CFLAGS_OTHER})
@@ -28,7 +25,7 @@ find_path (
 
 find_library (
     ZYRE_LIBRARIES
-    NAMES zyre
+    NAMES libzyre zyre
     HINTS ${PC_ZYRE_LIBRARY_HINTS}
 )
 

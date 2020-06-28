@@ -26,7 +26,7 @@
 //
 
 void
-glar_private_selftest (bool verbose)
+glar_private_selftest (bool verbose, const char *subtest)
 {
 }
 /*

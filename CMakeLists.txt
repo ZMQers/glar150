@@ -6,7 +6,7 @@
 ########################################################################
 # Project setup
 ########################################################################
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.12)
 project(glar150)
 enable_language(C)
 enable_testing()
@@ -14,10 +14,17 @@ enable_testing()
 set(SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 # Select flags
-SET(CMAKE_C_FLAGS_RELEASE "-O3")
+if(MSVC)
+    SET(CMAKE_C_FLAGS_RELEASE "/O2")
+else()
+    SET(CMAKE_C_FLAGS_RELEASE "-O3")
+endif()
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/builds/cmake/Modules)
 
 # Will be used to add flags to pkg-config useful when apps want to statically link
 set(pkg_config_libs_private "")
+set(pkg_config_names_private "")
 
 ########################################################################
 # options
@@ -44,7 +51,9 @@ if (NOT HAVE_NET_IF_H)
     CHECK_INCLUDE_FILE("net/if.h" HAVE_NET_IF_H)
 endif()
 
-file(WRITE "${SOURCE_DIR}/src/platform.h.in" "
+file(REMOVE "${SOURCE_DIR}/src/platform.h")
+
+file(WRITE "${PROJECT_BINARY_DIR}/platform.h.in" "
 #cmakedefine HAVE_LINUX_WIRELESS_H
 #cmakedefine HAVE_NET_IF_H
 #cmakedefine HAVE_NET_IF_MEDIA_H
@@ -52,22 +61,24 @@ file(WRITE "${SOURCE_DIR}/src/platform.h.in" "
 #cmakedefine HAVE_FREEIFADDRS
 ")
 
-configure_file("${SOURCE_DIR}/src/platform.h.in" "${SOURCE_DIR}/src/platform.h")
+configure_file("${PROJECT_BINARY_DIR}/platform.h.in" "${PROJECT_BINARY_DIR}/platform.h")
 
-#The MSVC C compiler is too out of date,
-#so the sources have to be compiled as c++
-if (MSVC)
-    enable_language(CXX)
-    file(GLOB sources "${SOURCE_DIR}/src/*.c")
-    set_source_files_properties(
-        ${sources}
-        PROPERTIES LANGUAGE CXX
-    )
+if (WIN32)
+    #The MSVC C compiler is too out of date,
+    #so the sources have to be compiled as c++
+    if (MSVC AND NOT (CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
+        enable_language(CXX)
+        file(GLOB sources "${SOURCE_DIR}/src/*.c")
+        set_source_files_properties(
+            ${sources}
+            PROPERTIES LANGUAGE CXX
+        )
+    endif()
     set(MORE_LIBRARIES ws2_32 Rpcrt4 Iphlpapi)
 endif()
 
 # specific case of windows UWP
-if( ${CMAKE_SYSTEM_NAME} STREQUAL "WindowsStore" AND ${CMAKE_SYSTEM_VERSION} STREQUAL "10.0")
+if( "${CMAKE_SYSTEM_NAME}" STREQUAL "WindowsStore" AND "${CMAKE_SYSTEM_VERSION}" STREQUAL "10.0")
   ADD_DEFINITIONS(-DZMQ_HAVE_WINDOWS_UWP)
   ADD_DEFINITIONS(-D_WIN32_WINNT=_WIN32_WINNT_WIN10)
 endif()
@@ -85,6 +96,7 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH "${SOURCE_DIR}")
 set(OPTIONAL_LIBRARIES)
+set(OPTIONAL_LIBRARIES_STATIC)
 
 ########################################################################
 # LIBZMQ dependency
@@ -93,7 +105,12 @@ find_package(libzmq REQUIRED)
 IF (LIBZMQ_FOUND)
     include_directories(${LIBZMQ_INCLUDE_DIRS})
     list(APPEND MORE_LIBRARIES ${LIBZMQ_LIBRARIES})
-    set(pkg_config_libs_private "${pkg_config_libs_private} -lzmq")
+  IF (PC_LIBZMQ_FOUND)
+      set(pkg_config_names_private "${pkg_config_names_private} libzmq")
+      list(APPEND OPTIONAL_LIBRARIES_STATIC ${PC_LIBZMQ_STATIC_LDFLAGS})
+  ELSE (PC_LIBZMQ_FOUND)
+      set(pkg_config_libs_private "${pkg_config_libs_private} -lzmq")
+  ENDIF (PC_LIBZMQ_FOUND)
 ELSE (LIBZMQ_FOUND)
     message( FATAL_ERROR "libzmq not found." )
 ENDIF (LIBZMQ_FOUND)
@@ -105,7 +122,12 @@ find_package(czmq REQUIRED)
 IF (CZMQ_FOUND)
     include_directories(${CZMQ_INCLUDE_DIRS})
     list(APPEND MORE_LIBRARIES ${CZMQ_LIBRARIES})
-    set(pkg_config_libs_private "${pkg_config_libs_private} -lczmq")
+  IF (PC_CZMQ_FOUND)
+      set(pkg_config_names_private "${pkg_config_names_private} libczmq")
+      list(APPEND OPTIONAL_LIBRARIES_STATIC ${PC_CZMQ_STATIC_LDFLAGS})
+  ELSE (PC_CZMQ_FOUND)
+      set(pkg_config_libs_private "${pkg_config_libs_private} -lczmq")
+  ENDIF (PC_CZMQ_FOUND)
 ELSE (CZMQ_FOUND)
     message( FATAL_ERROR "czmq not found." )
 ENDIF (CZMQ_FOUND)
@@ -117,10 +139,25 @@ find_package(zyre REQUIRED)
 IF (ZYRE_FOUND)
     include_directories(${ZYRE_INCLUDE_DIRS})
     list(APPEND MORE_LIBRARIES ${ZYRE_LIBRARIES})
-    set(pkg_config_libs_private "${pkg_config_libs_private} -lzyre")
+  IF (PC_ZYRE_FOUND)
+      set(pkg_config_names_private "${pkg_config_names_private} libzyre")
+      list(APPEND OPTIONAL_LIBRARIES_STATIC ${PC_ZYRE_STATIC_LDFLAGS})
+  ELSE (PC_ZYRE_FOUND)
+      set(pkg_config_libs_private "${pkg_config_libs_private} -lzyre")
+  ENDIF (PC_ZYRE_FOUND)
 ELSE (ZYRE_FOUND)
     message( FATAL_ERROR "zyre not found." )
 ENDIF (ZYRE_FOUND)
+
+########################################################################
+# version
+########################################################################
+set(GLAR_VERSION_MAJOR 0)
+set(GLAR_VERSION_MINOR 0)
+set(GLAR_VERSION_PATCH 1)
+set(GLAR_VERSION "${GLAR_VERSION_MAJOR}.${GLAR_VERSION_MINOR}.${GLAR_VERSION_PATCH}")
+message(STATUS "Detected GLAR Version - ${GLAR_VERSION}")
+
 
 ########################################################################
 # includes
@@ -144,7 +181,9 @@ install(FILES ${glar_headers} DESTINATION include)
 ########################################################################
 # library
 ########################################################################
-include_directories("${SOURCE_DIR}/src" "${SOURCE_DIR}/include")
+
+
+include_directories("${SOURCE_DIR}/src" "${SOURCE_DIR}/include" "${PROJECT_BINARY_DIR}")
 set (glar_sources
 )
 
@@ -161,28 +200,104 @@ IF (ENABLE_DRAFTS)
 ENDIF (ENABLE_DRAFTS)
 
 source_group("Source Files" FILES ${glar_sources})
-if (NOT DEFINED BUILD_SHARED_LIBS)
-    SET(BUILD_SHARED_LIBS ON)
-endif()
-add_library(glar ${glar_sources})
-set_target_properties(glar
-    PROPERTIES DEFINE_SYMBOL "GLAR_EXPORTS"
-)
-set_target_properties (glar
-    PROPERTIES SOVERSION "0"
-)
-set_target_properties (glar
-    PROPERTIES VERSION "0.0.1"
-)
-target_link_libraries(glar
-    ${ZEROMQ_LIBRARIES} ${MORE_LIBRARIES}
-)
 
-install(TARGETS glar
+
+option(GLAR_BUILD_SHARED "Whether or not to build the shared object" ON)
+option(GLAR_BUILD_STATIC "Whether or not to build the static archive" ON)
+
+if (NOT GLAR_BUILD_SHARED AND NOT GLAR_BUILD_STATIC)
+  message(FATAL_ERROR "Neither static nor shared library build enabled")
+endif()
+
+IF (NOT MSVC)
+  # avoid building everything twice for shared + static
+  # only on *nix, as Windows needs different preprocessor defines in static builds
+  add_library (glar_objects OBJECT ${glar_sources})
+  set_property(TARGET glar_objects PROPERTY POSITION_INDEPENDENT_CODE ON)
+ENDIF (NOT MSVC)
+
+# shared
+if (GLAR_BUILD_SHARED)
+  IF (APPLE)
+    add_library(glar SHARED ${glar_sources})
+  ELSE (APPLE)
+    IF (MSVC)
+      add_library(glar SHARED ${glar_sources})
+    ELSE (MSVC)
+      add_library(glar SHARED $<TARGET_OBJECTS:glar_objects>)
+    ENDIF (MSVC)
+  ENDIF(APPLE)
+
+  set_target_properties (glar PROPERTIES
+    PUBLIC_HEADER "${public_headers}"
+    DEFINE_SYMBOL "GLAR_EXPORTS"
+    SOVERSION "0"
+    VERSION "${GLAR_VERSION}"
+    COMPILE_DEFINITIONS "DLL_EXPORT"
+    OUTPUT_NAME "glar"
+    PREFIX "lib"
+  )
+
+  target_link_libraries(glar
+    PUBLIC ${MORE_LIBRARIES}
+  )
+
+  install(TARGETS glar
+    EXPORT glar-targets
     LIBRARY DESTINATION "lib${LIB_SUFFIX}" # .so file
     ARCHIVE DESTINATION "lib${LIB_SUFFIX}" # .lib file
-    RUNTIME DESTINATION bin              # .dll file
-)
+    RUNTIME DESTINATION bin                # .dll file
+  )
+
+  target_include_directories(glar
+    PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+      $<INSTALL_INTERFACE:include>
+  )
+endif()
+
+# static
+if (GLAR_BUILD_STATIC)
+  IF (APPLE)
+    add_library(glar-static STATIC ${glar_sources})
+  ELSE (APPLE)
+    IF (MSVC)
+      add_library(glar-static STATIC ${glar_sources})
+    ELSE (MSVC)
+      add_library(glar-static STATIC $<TARGET_OBJECTS:glar_objects>)
+    ENDIF (MSVC)
+  ENDIF (APPLE)
+
+  set_target_properties(glar-static PROPERTIES
+    PUBLIC_HEADER "${public_headers}"
+    COMPILE_DEFINITIONS "GLAR_STATIC"
+    OUTPUT_NAME "glar"
+    PREFIX "lib"
+  )
+
+  target_link_libraries(glar-static
+    PUBLIC ${MORE_LIBRARIES}
+  )
+
+  install(TARGETS glar-static
+    EXPORT glar-targets
+    LIBRARY DESTINATION "lib${LIB_SUFFIX}" # .so file
+    ARCHIVE DESTINATION "lib${LIB_SUFFIX}" # .lib file
+    RUNTIME DESTINATION bin                # .dll file
+  )
+
+  target_include_directories(glar-static
+    PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+      $<INSTALL_INTERFACE:include>
+  )
+  target_compile_definitions(glar-static
+    PUBLIC GLAR_STATIC
+  )
+
+endif()
+
+
 
 ########################################################################
 # pkgconfig
@@ -208,12 +323,41 @@ install(
 )
 
 ########################################################################
+# installer
+########################################################################
+include(CMakePackageConfigHelpers)
+if (WIN32)
+  set(CMAKECONFIG_INSTALL_DIR "CMake" CACHE STRING "install path for glarConfig.cmake")
+else()
+  # GNUInstallDirs "DATADIR" wrong here; CMake search path wants "share".
+  set(CMAKECONFIG_INSTALL_DIR "share/cmake/glar" CACHE STRING "install path for glarConfig.cmake")
+endif()
+
+if (NOT CMAKE_VERSION VERSION_LESS 3.0)
+  export(EXPORT glar-targets
+         FILE "${CMAKE_CURRENT_BINARY_DIR}/glarTargets.cmake")
+endif()
+configure_package_config_file(builds/cmake/Config.cmake.in
+                              "${CMAKE_CURRENT_BINARY_DIR}/glarConfig.cmake"
+                              INSTALL_DESTINATION ${CMAKECONFIG_INSTALL_DIR})
+write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/glarConfigVersion.cmake
+                                 VERSION ${GLAR_VERSION}
+                                 COMPATIBILITY AnyNewerVersion)
+install(EXPORT glar-targets
+        FILE glarTargets.cmake
+        DESTINATION ${CMAKECONFIG_INSTALL_DIR})
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/glarConfig.cmake
+              ${CMAKE_CURRENT_BINARY_DIR}/glarConfigVersion.cmake
+              DESTINATION ${CMAKECONFIG_INSTALL_DIR})
+
+########################################################################
 # executables
 ########################################################################
 add_executable(
     glard
     "${SOURCE_DIR}/src/glard.c"
 )
+if (TARGET glar)
 target_link_libraries(
     glard
     glar
@@ -222,6 +366,18 @@ target_link_libraries(
     ${ZYRE_LIBRARIES}
     ${OPTIONAL_LIBRARIES}
 )
+endif()
+if (NOT TARGET glar AND TARGET glar-static)
+target_link_libraries(
+    glard
+    glar-static
+    ${LIBZMQ_LIBRARIES}
+    ${CZMQ_LIBRARIES}
+    ${ZYRE_LIBRARIES}
+    ${OPTIONAL_LIBRARIES}
+    ${OPTIONAL_LIBRARIES_STATIC}
+)
+endif()
 install(TARGETS glard
     RUNTIME DESTINATION bin
 )
@@ -229,6 +385,7 @@ add_executable(
     glar_selftest
     "${SOURCE_DIR}/src/glar_selftest.c"
 )
+if (TARGET glar)
 target_link_libraries(
     glar_selftest
     glar
@@ -237,6 +394,18 @@ target_link_libraries(
     ${ZYRE_LIBRARIES}
     ${OPTIONAL_LIBRARIES}
 )
+endif()
+if (NOT TARGET glar AND TARGET glar-static)
+target_link_libraries(
+    glar_selftest
+    glar-static
+    ${LIBZMQ_LIBRARIES}
+    ${CZMQ_LIBRARIES}
+    ${ZYRE_LIBRARIES}
+    ${OPTIONAL_LIBRARIES}
+    ${OPTIONAL_LIBRARIES_STATIC}
+)
+endif()
 
 ########################################################################
 # tests
@@ -260,26 +429,25 @@ IF (ENABLE_DRAFTS)
     )
 ENDIF (ENABLE_DRAFTS)
 
-IF (ENABLE_DRAFTS)
-    list (APPEND TEST_CLASSES
-    private_classes
+
+if (NOT TARGET copy-selftest-ro)
+    add_custom_target(
+        copy-selftest-ro ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_SOURCE_DIR}/src/selftest-ro ${PROJECT_BINARY_DIR}/src/selftest-ro
     )
-ENDIF (ENABLE_DRAFTS)
+endif()
 
+if (NOT TARGET make-selftest-rw)
+    add_custom_target(
+        make-selftest-rw ALL
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_BINARY_DIR}/src/selftest-rw
+    )
+endif()
 
-add_custom_target(
-    copy-selftest-ro ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/src/selftest-ro ${CMAKE_BINARY_DIR}/src/selftest-ro
-)
-
-add_custom_target(
-    make-selftest-rw ALL
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/src/selftest-rw
-)
 
 set_directory_properties(
     PROPERTIES
-    ADDITIONAL_MAKE_CLEAN_FILES "${CMAKE_BINARY_DIR}/src/selftest-ro;${CMAKE_BINARY_DIR}/src/selftest-rw"
+    ADDITIONAL_MAKE_CLEAN_FILES "${PROJECT_BINARY_DIR}/src/selftest-ro;${PROJECT_BINARY_DIR}/src/selftest-rw"
 )
 
 foreach(TEST_CLASS ${TEST_CLASSES})
@@ -287,6 +455,13 @@ foreach(TEST_CLASS ${TEST_CLASSES})
         NAME ${TEST_CLASS}
         COMMAND glar_selftest --continue --verbose --test ${TEST_CLASS}
     )
+    IF (WIN32 AND CMAKE_PREFIX_PATH)
+        file(TO_NATIVE_PATH "${CMAKE_PREFIX_PATH}" CMAKE_PREFIX_PATH_WIN)
+        set_tests_properties(
+            ${TEST_CLASS}
+            PROPERTIES ENVIRONMENT "PATH=%PATH%\;${CMAKE_PREFIX_PATH_WIN}\\bin"
+        )
+    ENDIF (WIN32 AND CMAKE_PREFIX_PATH)
     set_tests_properties(
         ${TEST_CLASS}
         PROPERTIES TIMEOUT ${CLASSTEST_TIMEOUT}
@@ -302,22 +477,24 @@ include(CTest)
 ########################################################################
 # cleanup
 ########################################################################
-add_custom_target (distclean @echo Cleaning for source distribution)
+if (NOT TARGET distclean)
+    add_custom_target (distclean @echo Cleaning for source distribution)
+endif()
 
-set(cmake_generated ${CMAKE_BINARY_DIR}/CMakeCache.txt
-                    ${CMAKE_BINARY_DIR}/cmake_install.cmake
-                    ${CMAKE_BINARY_DIR}/Makefile
-                    ${CMAKE_BINARY_DIR}/CMakeFiles
-                    ${CMAKE_BINARY_DIR}/CTestTestfile.cmake
-                    ${CMAKE_BINARY_DIR}/DartConfiguration.tcl
-                    ${CMAKE_BINARY_DIR}/Testing
-                    ${CMAKE_BINARY_DIR}/compile_commands.json
-                    ${CMAKE_BINARY_DIR}/src/platform.h
-                    ${CMAKE_BINARY_DIR}/src/libglar.pc
-                    ${CMAKE_BINARY_DIR}/src/libglar.so
-                    ${CMAKE_BINARY_DIR}/src/glar150_selftest
-                    ${CMAKE_BINARY_DIR}/src/glard
-                    ${CMAKE_BINARY_DIR}/src/glar_selftest
+set(cmake_generated ${PROJECT_BINARY_DIR}/CMakeCache.txt
+                    ${PROJECT_BINARY_DIR}/cmake_install.cmake
+                    ${PROJECT_BINARY_DIR}/Makefile
+                    ${PROJECT_BINARY_DIR}/CMakeFiles
+                    ${PROJECT_BINARY_DIR}/CTestTestfile.cmake
+                    ${PROJECT_BINARY_DIR}/DartConfiguration.tcl
+                    ${PROJECT_BINARY_DIR}/Testing
+                    ${PROJECT_BINARY_DIR}/compile_commands.json
+                    ${PROJECT_BINARY_DIR}/platform.h
+                    ${PROJECT_BINARY_DIR}/src/libglar.pc
+                    ${PROJECT_BINARY_DIR}/src/libglar.so
+                    ${PROJECT_BINARY_DIR}/src/glar150_selftest
+                    ${PROJECT_BINARY_DIR}/src/glard
+                    ${PROJECT_BINARY_DIR}/src/glar_selftest
 )
 
 add_custom_command(
@@ -327,6 +504,8 @@ add_custom_command(
     ARGS    -rf CMakeTmp ${cmake_generated}
     TARGET  distclean
 )
+
+include(ClangFormat OPTIONAL)
 
 ########################################################################
 # summary
@@ -340,6 +519,8 @@ message (STATUS "  C compiler        :   ${CMAKE_C_COMPILER}")
 message (STATUS "  Debug C flags     :   ${CMAKE_C_FLAGS_DEBUG} ${CMAKE_C_FLAGS}")
 message (STATUS "  Release C flags   :   ${CMAKE_C_FLAGS_RELEASE} ${CMAKE_C_FLAGS}")
 message (STATUS "  Build type        :   ${CMAKE_BUILD_TYPE}")
+message (STATUS "  Static build      :   ${GLAR_BUILD_STATIC}")
+message (STATUS "  Shared build      :   ${GLAR_BUILD_SHARED}")
 IF (ENABLE_DRAFTS)
 message (STATUS "  Draft API         :   Yes")
 ELSE (ENABLE_DRAFTS)
@@ -360,13 +541,15 @@ message (STATUS "  -DENABLE-DRAFTS=[yes|no]")
 message (STATUS "")
 message (STATUS "*************************************************************")
 message (STATUS "Configuration complete! Now procced with:")
-message (STATUS "  'make'                compile the project")
-message (STATUS "  'make test'           run the project's selftest")
-message (STATUS "  'make install'        install the project to ${CMAKE_INSTALL_PREFIX}")
+message (STATUS "  'make'                 compile the project")
+message (STATUS "  'make test'            run the project's selftest")
+message (STATUS "  'make install'         install the project to ${CMAKE_INSTALL_PREFIX}")
 message (STATUS "")
 message (STATUS "Further options are:")
-message (STATUS "  'ctest -T memcheck'   run the project's selftest with")
-message (STATUS "                        valgrind to check for memory leaks")
+message (STATUS "  'ctest -V              run test with verbose logging")
+message (STATUS "  'ctest -R <test_name>' run a specific test")
+message (STATUS "  'ctest -T memcheck'    run the project's selftest with")
+message (STATUS "                         valgrind to check for memory leaks")
 message (STATUS "")
 
 ################################################################################
