@@ -33,6 +33,26 @@
 #define GLAR_VERSION \
     GLAR_MAKE_VERSION(GLAR_VERSION_MAJOR, GLAR_VERSION_MINOR, GLAR_VERSION_PATCH)
 
+// czmq_prelude.h bits
+#if !defined (__WINDOWS__)
+#   if (defined WIN32 || defined _WIN32 || defined WINDOWS || defined _WINDOWS)
+#       undef __WINDOWS__
+#       define __WINDOWS__
+#   endif
+#endif
+
+// Windows MSVS doesn't have stdbool
+#if (defined (_MSC_VER) && !defined (true))
+#   if (!defined (__cplusplus) && (!defined (true)))
+#       define true 1
+#       define false 0
+        typedef char bool;
+#   endif
+#else
+#   include <stdbool.h>
+#endif
+// czmq_prelude.h bits
+
 #if defined (__WINDOWS__)
 #   if defined GLAR_STATIC
 #       define GLAR_EXPORT
@@ -48,12 +68,16 @@
 #       define GLAR_EXPORT __declspec(dllimport)
 #   endif
 #   define GLAR_PRIVATE
-#else
+#elif defined (__CYGWIN__)
 #   define GLAR_EXPORT
+#   define GLAR_PRIVATE
+#else
 #   if (defined __GNUC__ && __GNUC__ >= 4) || defined __INTEL_COMPILER
 #       define GLAR_PRIVATE __attribute__ ((visibility ("hidden")))
+#       define GLAR_EXPORT __attribute__ ((visibility ("default")))
 #   else
 #       define GLAR_PRIVATE
+#       define GLAR_EXPORT
 #   endif
 #endif
 
@@ -76,9 +100,18 @@ typedef struct _glar_node_t glar_node_t;
 #endif // GLAR_BUILD_DRAFT_API
 
 #ifdef GLAR_BUILD_DRAFT_API
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 //  Self test for private classes
 GLAR_EXPORT void
-    glar_private_selftest (bool verbose);
+    glar_private_selftest (bool verbose, const char *subtest);
+
+#ifdef __cplusplus
+}
+#endif
 #endif // GLAR_BUILD_DRAFT_API
 
 #endif

@@ -20,14 +20,63 @@
 //  Platform definitions, must come first
 #include "platform.h"
 
+//  Asserts check the invariants of methods. If they're not
+//  fulfilled the program should fail fast. Therefore enforce them!
+#ifdef NDEBUG
+  #undef NDEBUG
+  #include <assert.h>
+  #define NDEBUG
+#else
+  #include <assert.h>
+#endif
+
 //  External API
 #include "../include/glar150.h"
 
-//  Extra headers
+//  Private external dependencies
 
 //  Opaque class structures to allow forward references
 
+//  Extra headers
+
 //  Internal API
+// common definitions and idioms from czmq_prelude.h, which are used in generated code
+#if ! defined(__CZMQ_PRELUDE_H_INCLUDED__)
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <assert.h>
+
+#define streq(s1,s2)    (!strcmp ((s1), (s2)))
+#define strneq(s1,s2)   (strcmp ((s1), (s2)))
+//  Replacement for malloc() which asserts if we run out of heap, and
+//  which zeroes the allocated block.
+static inline void *
+safe_malloc (size_t size, const char *file, unsigned line)
+{
+//     printf ("%s:%u %08d\n", file, line, (int) size);
+    void *mem = calloc (1, size);
+    if (mem == NULL) {
+        fprintf (stderr, "FATAL ERROR at %s:%u\n", file, line);
+        fprintf (stderr, "OUT OF MEMORY (malloc returned NULL)\n");
+        fflush (stderr);
+        abort ();
+    }
+    return mem;
+}
+
+//  Define _ZMALLOC_DEBUG if you need to trace memory leaks using e.g. mtrace,
+//  otherwise all allocations will claim to come from czmq_prelude.h. For best
+//  results, compile all classes so you see dangling object allocations.
+//  _ZMALLOC_PEDANTIC does the same thing, but its intention is to propagate
+//  out of memory condition back up the call stack.
+#if defined (_ZMALLOC_DEBUG) || defined (_ZMALLOC_PEDANTIC)
+#   define zmalloc(size) calloc(1,(size))
+#else
+#   define zmalloc(size) safe_malloc((size), __FILE__, __LINE__)
+#endif
+#endif // __CZMQ_PRELUDE_H_INCLUDED__
+
 
 
 //  *** To avoid double-definitions, only define if building without draft ***
@@ -35,7 +84,7 @@
 
 //  Self test for private classes
 GLAR_PRIVATE void
-    glar_private_selftest (bool verbose);
+    glar_private_selftest (bool verbose, const char *subtest);
 
 #endif // GLAR_BUILD_DRAFT_API
 
