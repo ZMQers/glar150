@@ -3,7 +3,7 @@
     prefix = "glar"
     script = "zproject.gsl"
     email = "zeromq-dev@lists.zeromq.org"
-    license = "MPLv2"
+    license = "MPL-2.0"
     url = "https://github.com/ZMQers/glar150"
     repository = "https://github.com/ZMQers/glar150">
 
