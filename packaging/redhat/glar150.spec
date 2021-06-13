@@ -24,7 +24,7 @@ Name:           glar150
 Version:        0.0.1
 Release:        1
 Summary:        gl-ar150 demo using zyre
-License:        MPLv2
+License:        MPL-2.0
 URL:            https://github.com/ZMQers/glar150
 Source0:        %{name}-%{version}.tar.gz
 Group:          System/Libraries
