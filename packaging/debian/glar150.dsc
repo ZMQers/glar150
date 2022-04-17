@@ -10,7 +10,6 @@ Build-Depends: debhelper (>= 9),
     libczmq-dev,
     libzyre-dev,
     systemd,
-    dh-systemd,
     asciidoc-base | asciidoc, xmlto,
     dh-autoreconf
 
