@@ -15,6 +15,7 @@
     <target name = "redhat" />
     <target name = "obs" />
     <target name = "travis" />
+    <target name = "gh_actions" />
 
     <use project = "zyre" />
 

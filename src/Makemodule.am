@@ -84,6 +84,7 @@ code:
 	cd $(srcdir)/src; gsl -topdir:.. -zproject:1 -q glar_node.xml
 	cd $(srcdir); gsl -target:- project.xml
 
+if ENABLE_GLAR_SELFTEST
 # Directories with test fixtures optionally provided by the project,
 # and with volatile RW data possibly created by a selftest program.
 # It is up to the project authors to populate the RO directory with
@@ -263,6 +264,7 @@ coverage: src/glar_selftest
 	@echo "call make clean && configure --with-gcov to enable code coverage"
 	@exit 1
 endif
+endif #ENABLE_GLAR_SELFTEST
 
 bindings: python-bindings
 
@@ -420,10 +422,12 @@ check-gitignore:
 	     echo "SKIP: $@ (no git)"; exit 0 ; \
 	   fi )
 
+if ENABLE_GLAR_SELFTEST
 # This calls the recipe above after building the project products and
 # the selftest binary, and preparing the workspace for self-testing:
 check-gitignore-all: all src/glar_selftest $(top_builddir)/$(SELFTEST_DIR_RW) $(top_builddir)/$(SELFTEST_DIR_RO)
 	$@$(MAKE) check-gitignore
+endif #ENABLE_GLAR_SELFTEST
 
 
 ################################################################################
