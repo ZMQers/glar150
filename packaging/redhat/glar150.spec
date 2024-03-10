@@ -117,3 +117,5 @@ find %{buildroot} -name '*.la' | xargs rm -f
 %endif
 
 %changelog
+* Wed Dec 31 2014 glar150 Developers <zeromq-dev@lists.zeromq.org
+- Initial packaging.
