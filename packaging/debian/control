@@ -13,14 +13,13 @@ Section:        net
 Priority:       optional
 Maintainer:     glar150 Developers <zeromq-dev@lists.zeromq.org>
 Standards-Version: 4.0.1.0
-Build-Depends: debhelper (>= 9),
-    pkg-config,
+Build-Depends: debhelper-compat (= 12),
+    pkgconf | pkg-config,
     libzmq3-dev,
     libczmq-dev,
     libzyre-dev,
-    systemd,
-    asciidoc-base | asciidoc, xmlto,
-    dh-autoreconf
+    systemd-dev | systemd,
+    asciidoc-base <!nodoc>, xmlto <!nodoc>,
 
 Package: libglar0
 Architecture: any

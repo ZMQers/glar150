@@ -4,14 +4,13 @@ Source: glar150
 Version: 0.0.1-0.1
 Maintainer: glar150 Developers <zeromq-dev@lists.zeromq.org>
 Architecture: any
-Build-Depends: debhelper (>= 9),
-    pkg-config,
+Build-Depends: debhelper-compat (= 12),
+    pkgconf | pkg-config,
     libzmq3-dev,
     libczmq-dev,
     libzyre-dev,
-    systemd,
-    asciidoc-base | asciidoc, xmlto,
-    dh-autoreconf
+    systemd-dev | systemd,
+    asciidoc-base <!nodoc>, xmlto <!nodoc>,
 
 Files:
  7697688bf65a35bc33ae2db51ebb0e3b 818110 glar150.tar.gz
